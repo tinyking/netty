@@ -54,6 +54,16 @@ public class Http2FrameCodecBuilder extends
     }
 
     @Override
+    public boolean httpClearTextUpgrade() {
+        return super.httpClearTextUpgrade();
+    }
+
+    @Override
+    public Http2FrameCodecBuilder httpClearTextUpgrade(boolean httpClearTextUpgrade) {
+        return super.httpClearTextUpgrade(httpClearTextUpgrade);
+    }
+
+    @Override
     public Http2Settings initialSettings() {
         return super.initialSettings();
     }

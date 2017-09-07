@@ -27,6 +27,11 @@ public final class Http2ConnectionHandlerBuilder
         extends AbstractHttp2ConnectionHandlerBuilder<Http2ConnectionHandler, Http2ConnectionHandlerBuilder> {
 
     @Override
+    public Http2ConnectionHandlerBuilder httpClearTextUpgrade(boolean httpClearTextUpgrade) {
+        return super.httpClearTextUpgrade(httpClearTextUpgrade);
+    }
+
+    @Override
     public Http2ConnectionHandlerBuilder validateHeaders(boolean validateHeaders) {
         return super.validateHeaders(validateHeaders);
     }

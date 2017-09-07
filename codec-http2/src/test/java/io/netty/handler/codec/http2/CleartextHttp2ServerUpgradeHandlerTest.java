@@ -60,7 +60,8 @@ public class CleartextHttp2ServerUpgradeHandlerTest {
     private void setUpServerChannel() {
         frameListener = mock(Http2FrameListener.class);
 
-        http2ConnectionHandler = new Http2ConnectionHandlerBuilder().frameListener(frameListener).build();
+        http2ConnectionHandler = new Http2ConnectionHandlerBuilder().httpClearTextUpgrade(true)
+                .frameListener(frameListener).build();
 
         UpgradeCodecFactory upgradeCodecFactory = new UpgradeCodecFactory() {
             @Override
@@ -138,6 +139,16 @@ public class CleartextHttp2ServerUpgradeHandlerTest {
         Http2Stream stream = http2ConnectionHandler.connection().stream(1);
         assertEquals(State.HALF_CLOSED_REMOTE, stream.state());
         assertFalse(stream.isHeadersSent());
+
+        String expectedHttpResponse = "HTTP/1.1 101 Switching Protocols\r\n" +
+                "connection: upgrade\r\n" +
+                "upgrade: h2c\r\n" +
+                "content-length: 0\r\n\r\n";
+        assertEquals(expectedHttpResponse, ((ByteBuf) channel.readOutbound()).toString(CharsetUtil.UTF_8));
+
+        // Check that the preface was send (a.k.a the settings frame)
+        assertNotNull(channel.readOutbound());
+        assertNull(channel.readOutbound());
     }
 
     @Test
