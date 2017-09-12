@@ -79,7 +79,6 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
     private ChannelFutureListener closeListener;
     private BaseDecoder byteDecoder;
     private long gracefulShutdownTimeoutMillis;
-    private boolean httpClearTextUpgrade;
 
     protected Http2ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder,
                                      Http2Settings initialSettings) {
@@ -108,14 +107,6 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
         }
         encoder = new DefaultHttp2ConnectionEncoder(connection, frameWriter);
         decoder = new DefaultHttp2ConnectionDecoder(connection, encoder, frameReader);
-    }
-
-    void httpClearTextUpgrade(boolean httpClearTextUpgrade) {
-        this.httpClearTextUpgrade = httpClearTextUpgrade;
-    }
-
-    boolean httpClearTextUpgrade() {
-        return httpClearTextUpgrade;
     }
 
     /**
@@ -165,8 +156,11 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
         if (connection().isServer()) {
             throw connectionError(PROTOCOL_ERROR, "Client-side HTTP upgrade requested for a server");
         }
-        if (prefaceSent() || decoder.prefaceReceived()) {
-            throw connectionError(PROTOCOL_ERROR, "HTTP upgrade must occur before HTTP/2 preface is sent or received");
+        if (!prefaceSent()) {
+            throw connectionError(PROTOCOL_ERROR, "HTTP upgrade must occur after preface was sent");
+        }
+        if (decoder.prefaceReceived()) {
+            throw connectionError(PROTOCOL_ERROR, "HTTP upgrade must occur before HTTP/2 preface is received");
         }
 
         // Create a local stream used for the HTTP cleartext upgrade.
@@ -181,8 +175,11 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
         if (!connection().isServer()) {
             throw connectionError(PROTOCOL_ERROR, "Server-side HTTP upgrade requested for a client");
         }
-        if (prefaceSent() || decoder.prefaceReceived()) {
-            throw connectionError(PROTOCOL_ERROR, "HTTP upgrade must occur before HTTP/2 preface is sent or received");
+        if (!prefaceSent()) {
+            throw connectionError(PROTOCOL_ERROR, "HTTP upgrade must occur after preface was sent");
+        }
+        if (decoder.prefaceReceived()) {
+            throw connectionError(PROTOCOL_ERROR, "HTTP upgrade must occur before HTTP/2 preface is received");
         }
 
         // Apply the settings but no ACK is necessary.
@@ -190,9 +187,6 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
 
         // Create a stream in the half-closed state.
         connection().remote().createStream(HTTP_UPGRADE_STREAM_ID, true);
-
-        // Now send the preface after we created the upgrade stream.
-        sendPreface();
     }
 
     @Override
@@ -232,13 +226,14 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
     }
 
     private final class PrefaceDecoder extends BaseDecoder {
-        private final ChannelHandlerContext ctx;
         private ByteBuf clientPrefaceString;
         private boolean prefaceSent;
 
         public PrefaceDecoder(ChannelHandlerContext ctx) {
-            this.ctx = ctx;
             clientPrefaceString = clientPrefaceString(encoder.connection());
+            // This handler was just added to the context. In case it was handled after
+            // the connection became active, send the connection preface now.
+            sendPreface(ctx);
         }
 
         @Override
@@ -262,7 +257,7 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
             // The channel just became active - send the connection preface to the remote endpoint.
-            sendPreface();
+            sendPreface(ctx);
         }
 
         @Override
@@ -358,7 +353,7 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
         /**
          * Sends the HTTP/2 connection preface upon establishment of the connection, if not already sent.
          */
-        void sendPreface() {
+        private void sendPreface(ChannelHandlerContext ctx) {
             if (prefaceSent || !ctx.channel().isActive()) {
                 return;
             }
@@ -388,12 +383,6 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
         }
     }
 
-    private void sendPreface() {
-        if (byteDecoder instanceof PrefaceDecoder) {
-            ((PrefaceDecoder) byteDecoder).sendPreface();
-        }
-    }
-
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         // Initialize the encoder, decoder, flow controllers, and internal state.
@@ -402,12 +391,6 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
         encoder.flowController().channelHandlerContext(ctx);
         decoder.flowController().channelHandlerContext(ctx);
         byteDecoder = new PrefaceDecoder(ctx);
-
-        if (!httpClearTextUpgrade) {
-            // This handler was just added to the context. In case it was handled after
-            // the connection became active, send the connection preface now.
-            sendPreface();
-        }
     }
 
     @Override
@@ -420,7 +403,9 @@ public class Http2ConnectionHandler extends ByteToMessageDecoder implements Http
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        // This cant be null as we construct it in handlerAdded(...)
+        if (byteDecoder == null) {
+            byteDecoder = new PrefaceDecoder(ctx);
+        }
         byteDecoder.channelActive(ctx);
         super.channelActive(ctx);
     }

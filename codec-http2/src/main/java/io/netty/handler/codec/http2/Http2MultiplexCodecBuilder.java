@@ -64,16 +64,6 @@ public class Http2MultiplexCodecBuilder
     }
 
     @Override
-    public boolean httpClearTextUpgrade() {
-        return super.httpClearTextUpgrade();
-    }
-
-    @Override
-    public Http2MultiplexCodecBuilder httpClearTextUpgrade(boolean httpClearTextUpgrade) {
-        return super.httpClearTextUpgrade(httpClearTextUpgrade);
-    }
-
-    @Override
     public Http2Settings initialSettings() {
         return super.initialSettings();
     }

@@ -36,18 +36,17 @@ public class Http2ServerUpgradeCodecTest {
 
     @Test
     public void testUpgradeToHttp2ConnectionHandler() {
-        testUpgrade(new Http2ConnectionHandlerBuilder().frameListener(new Http2FrameAdapter())
-                .httpClearTextUpgrade(true).build());
+        testUpgrade(new Http2ConnectionHandlerBuilder().frameListener(new Http2FrameAdapter()).build());
     }
 
     @Test
     public void testUpgradeToHttp2FrameCodec() {
-        testUpgrade(new Http2FrameCodecBuilder(true).httpClearTextUpgrade(true).build());
+        testUpgrade(new Http2FrameCodecBuilder(true).build());
     }
 
     @Test
     public void testUpgradeToHttp2MultiplexCodec() {
-        testUpgrade(new Http2MultiplexCodecBuilder(true, new HttpInboundHandler()).httpClearTextUpgrade(true).build());
+        testUpgrade(new Http2MultiplexCodecBuilder(true, new HttpInboundHandler()).build());
     }
 
     private static void testUpgrade(Http2ConnectionHandler handler) {

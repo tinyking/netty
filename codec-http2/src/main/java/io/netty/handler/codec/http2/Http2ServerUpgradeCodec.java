@@ -113,9 +113,6 @@ public class Http2ServerUpgradeCodec implements HttpServerUpgradeHandler.Upgrade
     private Http2ServerUpgradeCodec(String handlerName, Http2ConnectionHandler connectionHandler,
             ChannelHandler... handlers) {
         this.handlerName = handlerName;
-        if (!connectionHandler.httpClearTextUpgrade()) {
-            throw new IllegalStateException("Http2ConnectionHandler must be configured for http cleartext upgrade");
-        }
         this.connectionHandler = connectionHandler;
         this.handlers = handlers;
         frameReader = new DefaultHttp2FrameReader();
